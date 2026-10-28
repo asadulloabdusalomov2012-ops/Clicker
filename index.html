@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUETA Clicker</title>
+  <style>
+    :root { color-scheme: dark; --bg:#10121b; --panel:#1b1e2c; --gold:#ffd166; --muted:#aeb4c8; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,Segoe UI,sans-serif; color:#fff; background:radial-gradient(circle at top,#28213c 0,#10121b 55%); }
+    .app { width:min(100%,520px); margin:auto; padding:22px 16px 30px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    h1 { margin:0; font-size:23px; letter-spacing:1px; }
+    .tag { color:var(--gold); font-size:12px; border:1px solid #65512b; border-radius:20px; padding:6px 10px; }
+    .balance { margin:24px 0 18px; padding:22px; border-radius:22px; text-align:center; background:linear-gradient(135deg,#292d40,#1a1d2b); border:1px solid #34384c; }
+    .small { color:var(--muted); font-size:13px; }
+    #coins { font-size:40px; font-weight:800; color:var(--gold); margin:5px 0; overflow-wrap:anywhere; }
+    .tap-area { display:flex; justify-content:center; padding:18px 0 22px; }
+    #coin { width:210px; height:210px; border-radius:50%; border:8px solid #e6ae42; background:radial-gradient(circle at 35% 25%,#fff0a8,#ffc94f 42%,#b97717 100%); box-shadow:0 0 0 10px #ffc94f18,0 16px 35px #0008,inset 0 3px 8px #fff9; color:#6c430b; font-size:50px; font-weight:900; cursor:pointer; transition:transform .08s; touch-action:manipulation; user-select:none; }
+    #coin:active { transform:scale(.94); }
+    .hint { text-align:center; color:var(--muted); font-size:13px; margin-top:-4px; }
+    .stats { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:18px 0; }
+    .card { padding:16px; border:1px solid #303448; border-radius:16px; background:#1b1e2c; }
+    .card strong { display:block; font-size:21px; margin-top:4px; }
+    .section-title { margin:24px 0 10px; font-size:17px; }
+    .upgrade { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px; margin:10px 0; background:var(--panel); border:1px solid #303448; border-radius:15px; }
+    .upgrade p { margin:4px 0 0; color:var(--muted); font-size:12px; }
+    button.action { background:var(--gold); color:#211a0a; border:0; border-radius:11px; padding:10px 12px; font-weight:800; cursor:pointer; white-space:nowrap; }
+    button.action:disabled { opacity:.4; cursor:not-allowed; }
+    .footer { color:#858ba2; font-size:11px; text-align:center; margin-top:24px; line-height:1.5; }
+    #message { min-height:20px; text-align:center; color:var(--gold); font-size:13px; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>SUETA <span style="color:var(--gold)">CLICKER</span></h1>
+      <span class="tag">BETA • DEMO</span>
+    </header>
+
+    <section class="balance">
+      <div class="small">JAMI TANGALARINGIZ</div>
+      <div id="coins">0</div>
+      <div class="small">🪙 XORA tangalari</div>
+    </section>
+
+    <div class="tap-area">
+      <button id="coin" aria-label="Tanga ishlash uchun bosing">X</button>
+    </div>
+    <div class="hint">Tangalar ishlash uchun tangani bosing!</div>
+    <div id="message" role="status"></div>
+
+    <section class="stats">
+      <div class="card"><span class="small">Har bosishda</span><strong>+<span id="perTap">1</span> 🪙</strong></div>
+      <div class="card"><span class="small">Jami bosishlar</span><strong id="taps">0</strong></div>
+    </section>
+
+    <h2 class="section-title">⚡ Kuchaytirish</h2>
+    <div class="upgrade">
+      <div><strong>💪 Kuchli bosish</strong><p>Har bosishda +1 tanga beradi</p><p>Narxi: <span id="tapCost">50</span> 🪙</p></div>
+      <button class="action" id="buyTap">Olish</button>
+    </div>
+    <div class="upgrade">
+      <div><strong>🤖 Avto daromad</strong><p>Har soniyada tangalar beradi</p><p>Narxi: <span id="autoCost">100</span> 🪙</p></div>
+      <button class="action" id="buyAuto">Olish</button>
+    </div>
+    <div class="stats">
+      <div class="card"><span class="small">Bosish kuchi</span><strong id="power">1</strong></div>
+      <div class="card"><span class="small">Avto / soniya</span><strong id="auto">0</strong></div>
+    </div>
+    <p class="footer">Demo versiya: ma’lumotlar shu qurilmaning brauzerida saqlanadi. Bu haqiqiy pul emas; boshqa qurilmalarga yoki Telegram akkauntiga avtomatik sinxronlanmaydi.</p>
+  </main>
+
+  <script>
+    const KEY = "sueta_clicker_demo_v1";
+    const defaults = { coins: 0, taps: 0, power: 1, auto: 0, tapCost: 50, autoCost: 100 };
+    let state = { ...defaults };
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (saved && typeof saved === "object") {
+        for (const key of Object.keys(defaults)) {
+          if (Number.isFinite(saved[key]) && saved[key] >= 0) state[key] = saved[key];
+        }
+        state.power = Math.max(1, Math.floor(state.power));
+        state.auto = Math.floor(state.auto);
+        state.taps = Math.floor(state.taps);
+      }
+    } catch (_) {}
+
+    const $ = id => document.getElementById(id);
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+    }
+    function fmt(n) { return Math.floor(n).toLocaleString("uz-UZ"); }
+    function render() {
+      $("coins").textContent = fmt(state.coins);
+      $("taps").textContent = fmt(state.taps);
+      $("perTap").textContent = fmt(state.power);
+      $("power").textContent = fmt(state.power);
+      $("auto").textContent = fmt(state.auto);
+      $("tapCost").textContent = fmt(state.tapCost);
+      $("autoCost").textContent = fmt(state.autoCost);
+      $("buyTap").disabled = state.coins < state.tapCost;
+      $("buyAuto").disabled = state.coins < state.autoCost;
+    }
+    $("coin").addEventListener("click", () => {
+      state.coins += state.power;
+      state.taps += 1;
+      $("message").textContent = "+" + fmt(state.power) + " tanga!";
+      save(); render();
+    });
+    $("buyTap").addEventListener("click", () => {
+      if (state.coins < state.tapCost) return;
+      state.coins -= state.tapCost;
+      state.power += 1;
+      state.tapCost = Math.ceil(state.tapCost * 1.65);
+      $("message").textContent = "Bosish kuchi oshirildi!";
+      save(); render();
+    });
+    $("buyAuto").addEventListener("click", () => {
+      if (state.coins < state.autoCost) return;
+      state.coins -= state.autoCost;
+      state.auto += 1;
+      state.autoCost = Math.ceil(state.autoCost * 1.8);
+      $("message").textContent = "Avto daromad kuchaytirildi!";
+      save(); render();
+    });
+    setInterval(() => {
+      if (state.auto > 0) {
+        state.coins += state.auto;
+        save(); render();
+      }
+    }, 1000);
+    render();
+  </script>
+</body>
+</html>
